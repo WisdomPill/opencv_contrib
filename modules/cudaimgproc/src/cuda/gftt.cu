@@ -56,7 +56,7 @@ namespace cv { namespace cuda { namespace device
 
         __device__ int g_counter = 0;
 
-        template <class Mask> __global__ void findCorners(float threshold, const Mask mask, float2* corners, int max_count, int rows, int cols)
+        template <class Mask> __global__ void findCorners(float threshold, const Mask mask, float3* corners, int max_count, int rows, int cols)
         {
             const int j = blockIdx.x * blockDim.x + threadIdx.x;
             const int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -85,13 +85,13 @@ namespace cv { namespace cuda { namespace device
                         const int ind = ::atomicAdd(&g_counter, 1);
 
                         if (ind < max_count)
-                            corners[ind] = make_float2(j, i);
+                            corners[ind] = make_float3(j, i, val);
                     }
                 }
             }
         }
 
-        int findCorners_gpu(PtrStepSzf eig, float threshold, PtrStepSzb mask, float2* corners, int max_count, cudaStream_t stream)
+        int findCorners_gpu(PtrStepSzf eig, float threshold, PtrStepSzb mask, float3* corners, int max_count, cudaStream_t stream)
         {
             void* counter_ptr;
             cudaSafeCall( cudaGetSymbolAddress(&counter_ptr, g_counter) );
@@ -122,18 +122,18 @@ namespace cv { namespace cuda { namespace device
         class EigGreater
         {
         public:
-            __device__ __forceinline__ bool operator()(float2 a, float2 b) const
+            __device__ __forceinline__ bool operator()(float3 a, float3 b) const
             {
-                return tex2D(eigTex, a.x, a.y) > tex2D(eigTex, b.x, b.y);
+                return a.z > b.z;
             }
         };
 
 
-        void sortCorners_gpu(PtrStepSzf eig, float2* corners, int count, cudaStream_t stream)
+        void sortCorners_gpu(PtrStepSzf eig, float3* corners, int count, cudaStream_t stream)
         {
             bindTexture(&eigTex, eig);
 
-            thrust::device_ptr<float2> ptr(corners);
+            thrust::device_ptr<float3> ptr(corners);
 #if THRUST_VERSION >= 100802
             if (stream)
                 thrust::sort(thrust::cuda::par(ThrustAllocator::getAllocator()).on(stream), ptr, ptr + count, EigGreater());

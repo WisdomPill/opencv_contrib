@@ -55,8 +55,8 @@ namespace cv { namespace cuda { namespace device
 {
     namespace gfft
     {
-        int findCorners_gpu(PtrStepSzf eig, float threshold, PtrStepSzb mask, float2* corners, int max_count, cudaStream_t stream);
-        void sortCorners_gpu(PtrStepSzf eig, float2* corners, int count, cudaStream_t stream);
+        int findCorners_gpu(PtrStepSzf eig, float threshold, PtrStepSzb mask, float3* corners, int max_count, cudaStream_t stream);
+        void sortCorners_gpu(PtrStepSzf eig, float3* corners, int count, cudaStream_t stream);
     }
 }}}
 
@@ -110,9 +110,9 @@ namespace
         double maxVal = 0;
         cuda::minMax(eig_, 0, &maxVal);
         cudaStream_t stream_ = StreamAccessor::getStream(stream);
-        ensureSizeIsEnough(1, std::max(1000, static_cast<int>(image.size().area() * 0.05)), CV_32FC2, tmpCorners_);
+        ensureSizeIsEnough(1, std::max(1000, static_cast<int>(image.size().area() * 0.05)), CV_32FC3, tmpCorners_);
 
-        int total = findCorners_gpu(eig_, static_cast<float>(maxVal * qualityLevel_), mask, tmpCorners_.ptr<float2>(), tmpCorners_.cols, stream_);
+        int total = findCorners_gpu(eig_, static_cast<float>(maxVal * qualityLevel_), mask, tmpCorners_.ptr<float3>(), tmpCorners_.cols, stream_);
 
         if (total == 0)
         {
@@ -120,7 +120,7 @@ namespace
             return;
         }
 
-        sortCorners_gpu(eig_, tmpCorners_.ptr<float2>(), total, stream_);
+        sortCorners_gpu(eig_, tmpCorners_.ptr<float3>(), total, stream_);
 
         if (minDistance_ < 1)
         {
@@ -128,22 +128,22 @@ namespace
         }
         else
         {
-            std::vector<Point2f> tmp(total);
-            Mat tmpMat(1, total, CV_32FC2, (void*)&tmp[0]);
+            std::vector<Point3f> tmp(total);
+            Mat tmpMat(1, total, CV_32FC3, (void*)&tmp[0]);
             tmpCorners_.colRange(0, total).download(tmpMat, stream);
             stream.waitForCompletion();
-            std::vector<Point2f> tmp2;
+            std::vector<Point3f> tmp2;
             tmp2.reserve(total);
 
             const int cell_size = cvRound(minDistance_);
             const int grid_width = (image.cols + cell_size - 1) / cell_size;
             const int grid_height = (image.rows + cell_size - 1) / cell_size;
 
-            std::vector< std::vector<Point2f> > grid(grid_width * grid_height);
+            std::vector< std::vector<Point3f> > grid(grid_width * grid_height);
 
             for (int i = 0; i < total; ++i)
             {
-                Point2f p = tmp[i];
+                Point3f p = tmp[i];
 
                 bool good = true;
 
@@ -165,7 +165,7 @@ namespace
                 {
                     for (int xx = x1; xx <= x2; xx++)
                     {
-                        std::vector<Point2f>& m = grid[yy * grid_width + xx];
+                        std::vector<Point3f>& m = grid[yy * grid_width + xx];
 
                         if (!m.empty())
                         {
@@ -197,10 +197,10 @@ namespace
                 }
             }
 
-            _corners.create(1, static_cast<int>(tmp2.size()), CV_32FC2);
+            _corners.create(1, static_cast<int>(tmp2.size()), CV_32FC3);
             GpuMat corners = _corners.getGpuMat();
 
-            corners.upload(Mat(1, static_cast<int>(tmp2.size()), CV_32FC2, &tmp2[0]), stream);
+            corners.upload(Mat(1, static_cast<int>(tmp2.size()), CV_32FC3, &tmp2[0]), stream);
         }
     }
 }

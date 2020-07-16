@@ -83,11 +83,11 @@ CUDA_TEST_P(GoodFeaturesToTrack, Accuracy)
 
     ASSERT_FALSE(d_pts.empty());
 
-    std::vector<cv::Point2f> pts(d_pts.cols);
-    cv::Mat pts_mat(1, d_pts.cols, CV_32FC2, (void*) &pts[0]);
+    std::vector<cv::Point3f> pts(d_pts.cols);
+    cv::Mat pts_mat(1, d_pts.cols, CV_32FC3, (void*) &pts[0]);
     d_pts.download(pts_mat);
 
-    std::vector<cv::Point2f> pts_gold;
+    std::vector<cv::Point3f> pts_gold;
     cv::goodFeaturesToTrack(image, pts_gold, maxCorners, qualityLevel, minDistance);
 
     ASSERT_EQ(pts_gold.size(), pts.size());
@@ -95,10 +95,10 @@ CUDA_TEST_P(GoodFeaturesToTrack, Accuracy)
     size_t mistmatch = 0;
     for (size_t i = 0; i < pts.size(); ++i)
     {
-        cv::Point2i a = pts_gold[i];
-        cv::Point2i b = pts[i];
+        cv::Point3i a = pts_gold[i];
+        cv::Point3i b = pts[i];
 
-        bool eq = std::abs(a.x - b.x) < 1 && std::abs(a.y - b.y) < 1;
+        bool eq = std::abs(a.x - b.x) < 1 && std::abs(a.y - b.y) < 1 && std::abs(a.z - b.z) < 1;
 
         if (!eq)
             ++mistmatch;
@@ -115,7 +115,7 @@ CUDA_TEST_P(GoodFeaturesToTrack, EmptyCorners)
     double qualityLevel = 0.01;
 
     cv::cuda::GpuMat src(100, 100, CV_8UC1, cv::Scalar::all(0));
-    cv::cuda::GpuMat corners(1, maxCorners, CV_32FC2);
+    cv::cuda::GpuMat corners(1, maxCorners, CV_32FC3);
 
     cv::Ptr<cv::cuda::CornersDetector> detector = cv::cuda::createGoodFeaturesToTrackDetector(src.type(), maxCorners, qualityLevel, minDistance);
 
